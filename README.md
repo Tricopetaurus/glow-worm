@@ -51,7 +51,7 @@ Afterward, within the `build/src` folder, use the `.uf2` file for programming
 The RP2040 will reboot, starting code
 
 ## TODO
-- [ ] Verify 3.3v is enough to reach a logical high for WS2812
+- [x] Verify 3.3v is enough to reach a logical high for WS2812
 - [ ] Create control interface between RP2040 and RIO
 - [ ] Create a list of patterns for the RP2040 to output
 
