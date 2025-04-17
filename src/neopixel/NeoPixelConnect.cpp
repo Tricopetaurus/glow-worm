@@ -59,6 +59,7 @@ void NeoPixelConnect::neoPixelInit(uint8_t pinNumber, uint16_t numberOfPixels) {
     this->neoPixelShow();
 }
 
+
 /// @brief Set a NeoPixel to a given color. By setting autoShow to true, change is
 /// displayed immediately.
 /// @param pixelNumber: set a color for a specific neopixel in the string
