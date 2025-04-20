@@ -4,17 +4,18 @@ add_executable(glowworm
 )
 
 pico_enable_stdio_usb(glowworm 1)
-pico_enable_stdio_uart(glowworm 0)
 
 pico_add_extra_outputs(glowworm)
 
-add_subdirectory(neopixel)
-add_subdirectory(color)
+add_subdirectory(leds)
+add_subdirectory(usb)
+add_subdirectory(accelerometer)
 
 target_link_libraries(
     glowworm
-    neopixel
-    color
+    leds
+    usb
+    accelerometer
     pico_stdlib
     hardware_adc
     hardware_dma
