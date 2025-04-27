@@ -3,9 +3,9 @@
 #include "color.h"
 
 namespace leds {
-
   void init();
   void loop();
+  void set_pattern_next();
   void off();
   void blink_good();
   void blink_bad();

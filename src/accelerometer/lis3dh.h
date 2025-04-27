@@ -45,7 +45,9 @@ namespace lis {
   constexpr int TAP_CFG_YS = (1<<2);
   constexpr int TAP_CFG_XD = (1<<1);
   constexpr int TAP_CFG_XS = (1<<0);
-  constexpr int TAP_CFG_DEFAULT = (TAP_CFG_XD);
+  // Some #DUMB problem with the accelerometer
+  // https://community.st.com/t5/mems-sensors/lis3dh-single-and-double-click-interrupt-at-the-same-time/td-p/209186
+  constexpr int TAP_CFG_DEFAULT = (TAP_CFG_XD | TAP_CFG_YS | TAP_CFG_ZS);
 
   constexpr int REG_TAP_SRC = 0x39;
   constexpr int TAP_SRC_DTAP = (1<<5);
@@ -56,13 +58,13 @@ namespace lis {
   constexpr int TAP_SRC_X = (1<<0);
 
   constexpr int REG_TAP_THS = 0x3A;
-  constexpr int TAP_THS_DEFAULT = 80;
+  constexpr int TAP_THS_DEFAULT = 60;
 
   constexpr int REG_TAP_DURATION = 0x3B;
-  constexpr int TAP_DURATION_DEFAULT = 0x33; // If ODR is 400, this is 127ms. Values supplied in appnote
+  constexpr int TAP_DURATION_DEFAULT = 0x33;
 
   constexpr int REG_TAP_TIME_LATENCY = 0x3C;
-  constexpr int TAP_TIME_LATENCY_DEFAULT = 0x30;
+  constexpr int TAP_TIME_LATENCY_DEFAULT = 0x40;
 
   constexpr int REG_TAP_TIME_WINDOW = 0x3D;
   constexpr int TAP_TIME_WINDOW_DEFAULT = 100;

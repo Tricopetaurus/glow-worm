@@ -9,8 +9,8 @@
 static void irq_callback(uint gpio, uint32_t events);
 static uint8_t read_register_u8(uint8_t addr);
 static void write_register_u8(uint8_t addr, uint8_t val);
-static uint16_t write_register_u16(uint8_t adsdr);
-static void write_register_u16(uint8_t addr, uint16_t val);
+
+static accel::CMD tap_src_to_cmd(uint8_t tap_src);
 
 static semaphore_t sem;
 
@@ -40,18 +40,11 @@ void accel::init() {
   gpio_set_irq_enabled_with_callback(lis::INT_PIN, GPIO_IRQ_EDGE_RISE, true, &irq_callback);
 }
 
-
-uint8_t accel::wait_for_tap() {
-  sem_acquire_blocking(&sem);
-  return read_register_u8(lis::REG_TAP_SRC);
-;
-}
-
-uint8_t accel::wait_for_tap_with_timeout_ms(unsigned int timeout_ms) {
+accel::CMD accel::wait_for_tap_with_timeout_ms(unsigned int timeout_ms) {
   if (sem_acquire_timeout_ms(&sem, timeout_ms)) {
-    return read_register_u8(lis::REG_TAP_SRC);
+    return tap_src_to_cmd(read_register_u8(lis::REG_TAP_SRC));
   } else {
-    return 0;
+    return CMD::NONE;
   }
 }
 
@@ -72,7 +65,7 @@ bool accel::test() {
     write_register_u8(lis::REG_TAP_DURATION, lis::TAP_DURATION_DEFAULT);
     write_register_u8(lis::REG_TAP_THS, lis::TAP_THS_DEFAULT);
     accel::clear_tap();
-    bool click_detected = accel::wait_for_tap_with_timeout_ms(1000);
+    bool click_detected = (accel::wait_for_tap_with_timeout_ms(1000) != CMD::NONE);
     if (!click_detected) {
       return false;
     }
@@ -102,10 +95,28 @@ static void write_register_u8(uint8_t addr, uint8_t val) {
   i2c_write_blocking(i2c_default, lis::ADDRESS, sendme, 2, false);
 }
 
-static uint16_t write_register_u16(uint8_t adsdr) {
+static accel::CMD tap_src_to_cmd(uint8_t tap_src) {
+  // We only care about tap events in the X direction
+#if 0
+  if ( (tap_src & lis::TAP_SRC_X) == 0) {
+    return accel::CMD::NONE;
+  }
 
-}
+  // We only care about taps in one direction
+  if ( (tap_src & lis::TAP_SRC_NEG) == 0) {
+    return accel::CMD::NONE;
+  }
+#endif
 
-static void write_register_u16(uint8_t addr, uint16_t val) {
+  // Now we can check whether it was a single or double tap
+  if (tap_src & lis::TAP_SRC_STAP) {
+    return accel::CMD::NEXT;
+  }
 
+  else if (tap_src & lis::TAP_SRC_DTAP) {
+    return accel::CMD::TOGGLE_AWAKE;
+  }
+
+  // WHOOPS. No idea how we got here.
+  return accel::CMD::NONE;
 }
