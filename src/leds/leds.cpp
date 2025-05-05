@@ -33,23 +33,31 @@ void leds::set_color(color::rgb_t clr) {
 }
 
 void leds::loop() {
-  gpio_put(LED_POWER_EN, true);
+  static constexpr uint32_t MS_PER_FRAME = 25;
+  static uint32_t last_frame_ms = 0;
   static size_t idx = 0;
+
+  uint32_t current_ms =  to_ms_since_boot(get_absolute_time());
+
+  gpio_put(LED_POWER_EN, true);
   static std::array<color::rgb_t, NUM_LEDS> frame = {};
 
-  patterns.get_frame(frame, idx);
+  if (current_ms - last_frame_ms > MS_PER_FRAME) {
+    last_frame_ms = current_ms;
 
-  for (int i = 0; i < frame.size(); i++) {
-    const auto& pixel = frame[i];
-    led_driver->neoPixelSetValue(i, pixel.r, pixel.g, pixel.b);
-  }
+    patterns.get_frame(frame, idx);
+    for (int i = 0; i < frame.size(); i++) {
+      const auto &pixel = frame[i];
+      led_driver->neoPixelSetValue(i, pixel.r, pixel.g, pixel.b);
+    }
 
-  led_driver->neoPixelShow();
+    led_driver->neoPixelShow();
 
-  if (idx < SIZE_MAX) {
-    idx += 1;
-  } else {
-    idx = 0;
+    if (idx < SIZE_MAX) {
+      idx += 1;
+    } else {
+      idx = 0;
+    }
   }
 }
 

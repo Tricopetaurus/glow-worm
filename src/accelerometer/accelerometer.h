@@ -9,7 +9,10 @@ namespace accel {
   };
 
   void init();
+  CMD loop();
+  void sleep_until_tap();
   void clear_tap();
+
   CMD wait_for_tap_with_timeout_ms(unsigned int timeout_ms);
   bool test();
 
