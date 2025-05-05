@@ -7,7 +7,7 @@
 
 static const char* USAGE_STR =
     "=========================" "\n"
-    " GLOW-WORM Firmware r1.0 " "\n"
+    " GLOW-WORM Firmware r1.1 " "\n"
     "=========================" "\n"
     " Commands:               " "\n"
     "   P: Program board with " "\n"

@@ -10,6 +10,8 @@
 #include "accelerometer.h"
 #include "lis3dh.h"
 
+#define DEBUG_PRINTS (false)
+
 static void irq_callback(uint gpio, uint32_t events);
 static uint8_t read_register_u8(uint8_t addr);
 static void write_register_u8(uint8_t addr, uint8_t val);
@@ -183,10 +185,12 @@ accel::CMD accel::loop() {
   }
 
   if (next_state != current_state) {
+#if defined(DEBUG_PRINTS) && (DEBUG_PRINTS)
     stdio_printf(":: %u :: %s -> %s\n",
                  current_time,
                  state_to_str(current_state),
                  state_to_str(next_state));
+#endif
     current_state = next_state;
     state_change_time = current_time;
   }
