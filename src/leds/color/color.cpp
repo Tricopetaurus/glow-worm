@@ -2,6 +2,9 @@
 #include <cstdint>
 #include <cmath>
 
+// This equation was pulled just about directly from Wikipedia,
+// Accessed from here around April 2025
+// https://en.wikipedia.org/wiki/HSL_and_HSV
 color::rgb_t color::hsl_to_rgb(const color::hsl_t& hsl) {
   rgb_t rgb = {0, 0, 0};
   float h = hsl.h;

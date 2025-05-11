@@ -1,3 +1,10 @@
+/**
+ * LIS3DH Module
+ * This is just a collection of constants to assist in writing to the
+ * LIS3DH accelerometer by ST.
+ * Datasheet available here:
+ * https://www.st.com/resource/en/datasheet/lis3dh.pdf
+ */
 #pragma once
 
 namespace lis {

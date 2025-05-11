@@ -12,67 +12,9 @@
 
 #define DEBUG_PRINTS (false)
 
-static void irq_callback(uint gpio, uint32_t events);
-static uint8_t read_register_u8(uint8_t addr);
-static void write_register_u8(uint8_t addr, uint8_t val);
-
-static accel::CMD tap_src_to_cmd(uint8_t tap_src);
-
-static semaphore_t sem;
-
-void accel::clear_tap() {
-  // We just want to set the permits back to 0 if it's not already there.
-  sem_try_acquire(&sem);
-}
-
-void accel::init() {
-  i2c_init(i2c_default, 100*1000);
-  gpio_set_function(PICO_DEFAULT_I2C_SDA_PIN, GPIO_FUNC_I2C);
-  gpio_set_function(PICO_DEFAULT_I2C_SCL_PIN, GPIO_FUNC_I2C);
-
-  // Set up our semaphore that'll track when a tap event comes around
-  sem_init(&sem, 0, 1);
-
-  // Configure accelerometer for double-tap, assign an interrupt to handle
-  write_register_u8(lis::REG_CTRL1, lis::CTRL1_DEFAULT);
-  write_register_u8(lis::REG_CTRL3, lis::CTRL3_DEFAULT);
-  write_register_u8(lis::REG_TAP_CFG, lis::TAP_CFG_DEFAULT);
-  write_register_u8(lis::REG_TAP_THS, lis::TAP_THS_DEFAULT);
-  write_register_u8(lis::REG_TAP_DURATION, lis::TAP_DURATION_DEFAULT);
-  write_register_u8(lis::REG_TAP_TIME_LATENCY, lis::TAP_TIME_LATENCY_DEFAULT);
-  write_register_u8(lis::REG_TAP_TIME_WINDOW, lis::TAP_TIME_WINDOW_DEFAULT);
-
-  gpio_init(lis::INT_PIN);
-  gpio_set_irq_enabled_with_callback(lis::INT_PIN, GPIO_IRQ_EDGE_RISE, true, &irq_callback);
-  accel::clear_tap();
-}
-
-bool accel::test() {
-  // Test #1: Check if WHOAMI has the expected value.
-  uint8_t whoami = read_register_u8(lis::REG_WHOAMI);
-  if (whoami != lis::EXPECTED_WHOAMI) {
-    return false;
-  }
-
-  // Test #2: Configure for single tap, then wait up to 1s for a tap.
-  {
-    write_register_u8(lis::REG_CTRL1, lis::CTRL1_DEFAULT);
-    write_register_u8(lis::REG_CTRL2, lis::CTRL2_DEFAULT);
-    write_register_u8(lis::REG_CTRL3, lis::CTRL3_DEFAULT);
-    write_register_u8(lis::REG_CTRL4, lis::CTRL4_DEFAULT);
-    write_register_u8(lis::REG_TAP_CFG, lis::TAP_CFG_DEFAULT);
-    write_register_u8(lis::REG_TAP_DURATION, lis::TAP_DURATION_DEFAULT);
-    write_register_u8(lis::REG_TAP_THS, lis::TAP_THS_DEFAULT);
-    accel::clear_tap();
-    bool click_detected = (accel::wait_for_tap_with_timeout_ms(1000) != CMD::NONE);
-    if (!click_detected) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
+// ================================
+//  PRIVATE VARIABLES
+// ================================
 enum class STATE {
   START,
   TAP_1,
@@ -82,30 +24,73 @@ enum class STATE {
   EVENT_DOUBLE_TAP
 };
 
-static constexpr const char* state_to_str(STATE s) {
-  switch(s) {
-  case STATE::START:
-    return "START";
-  case STATE::TAP_1:
-    return "TAP_1";
-  case STATE::NOISY_TAP:
-    return "NOISY_TAP";
-  case STATE::WAIT_1:
-    return "WAIT_1";
-  case STATE::EVENT_SINGLE_TAP:
-    return "SINGLE_TAP_EVENT";
-  case STATE::EVENT_DOUBLE_TAP:
-    return "DOUBLE_TAP_EVENT";
-  }
+static STATE current_state = STATE::START;
+static semaphore_t sem;
 
-  return "???";
+// ================================
+//  PRIVATE FUNCTION DECLARATIONS
+// ================================
+/**
+ * Generic Read of 8 bytes from a given accelerometer register
+ */
+static uint8_t read_register_u8(uint8_t addr);
+
+/**
+ * Generic Write of 8 bytes from a given accelerometer register
+ */
+static void write_register_u8(uint8_t addr, uint8_t val);
+
+/**
+ * Interrupt callback
+ * Whenever the GPIO for the accelerometer toggles because of a tap,
+ * control will immediately jump to this function.
+ */
+static void irq_callback(uint gpio, uint32_t events);
+
+/**
+ * Clear any registered tap events.
+ * Useful for kicking off the state machine from a known state
+ */
+static void clear_tap();
+
+/**
+ * Convenience function for logging.
+ * Returns a string representation of our current / next state.
+ */
+static constexpr const char* state_to_str(STATE s);
+
+// ================================
+//  PUBLIC FUNCTION DEFINITIONS
+// ================================
+void accel::init() {
+  // Set up for I2C communication with the accelerometer
+  i2c_init(i2c_default, 100*1000);
+  gpio_set_function(PICO_DEFAULT_I2C_SDA_PIN, GPIO_FUNC_I2C);
+  gpio_set_function(PICO_DEFAULT_I2C_SCL_PIN, GPIO_FUNC_I2C);
+
+  // Set up our semaphore that'll track when a tap event comes around
+  sem_init(&sem, 0, 1);
+
+  // Configure accelerometer for single-tap, assign an interrupt to handle events
+  // These are all using default values pulled from lis3dh.h
+  write_register_u8(lis::REG_CTRL1, lis::CTRL1_DEFAULT);
+  write_register_u8(lis::REG_CTRL3, lis::CTRL3_DEFAULT);
+  write_register_u8(lis::REG_TAP_CFG, lis::TAP_CFG_DEFAULT);
+  write_register_u8(lis::REG_TAP_THS, lis::TAP_THS_DEFAULT);
+  write_register_u8(lis::REG_TAP_DURATION, lis::TAP_DURATION_DEFAULT);
+  write_register_u8(lis::REG_TAP_TIME_LATENCY, lis::TAP_TIME_LATENCY_DEFAULT);
+  write_register_u8(lis::REG_TAP_TIME_WINDOW, lis::TAP_TIME_WINDOW_DEFAULT);
+
+  // Set up that interrupt for whenever tap events happen
+  gpio_init(lis::INT_PIN);
+  gpio_set_irq_enabled_with_callback(lis::INT_PIN, GPIO_IRQ_EDGE_RISE, true, &irq_callback);
+  clear_tap();
 }
 
 
 // Low power setting
 // If we're in the initial state (wait for tap)
 // Then we can just chill on a WFI until irq hits
-static STATE current_state = STATE::START;
 void accel::sleep_until_tap() {
   if (current_state == STATE::START) {
     // Stealing code from rp2_common/pico_sleep/sleep.c, processor_deep_sleep
@@ -144,7 +129,6 @@ accel::CMD accel::loop() {
 
   case STATE::TAP_1:
     // We need a minimum amount of time to pass as a filter against noise
-    // TODO: If it's too noisy do we want a cooldown?
     if (tap_occurred) {
       next_state = STATE::NOISY_TAP;
     } else if ((current_time - state_change_time) >= TIMEOUT_1_MS) {
@@ -198,6 +182,19 @@ accel::CMD accel::loop() {
   return command;
 }
 
+bool accel::test() {
+  // Test #1: Check if WHOAMI has the expected value.
+  uint8_t whoami = read_register_u8(lis::REG_WHOAMI);
+  if (whoami != lis::EXPECTED_WHOAMI) {
+    return false;
+  }
+
+  return true;
+}
+
+// ================================
+//  PRIVATE FUNCTION DEFINITIONS
+// ================================
 static void irq_callback(uint gpio, uint32_t events) {
   if (gpio != lis::INT_PIN) {
     return;
@@ -206,17 +203,6 @@ static void irq_callback(uint gpio, uint32_t events) {
     sem_release(&sem);
   }
 }
-
-
-
-accel::CMD accel::wait_for_tap_with_timeout_ms(unsigned int timeout_ms) {
-  if (sem_acquire_timeout_ms(&sem, timeout_ms)) {
-    return tap_src_to_cmd(read_register_u8(lis::REG_TAP_SRC));
-  } else {
-    return CMD::NONE;
-  }
-}
-
 
 static uint8_t read_register_u8(uint8_t addr) {
   uint8_t rval;
@@ -230,28 +216,25 @@ static void write_register_u8(uint8_t addr, uint8_t val) {
   i2c_write_blocking(i2c_default, lis::ADDRESS, sendme, 2, false);
 }
 
-static accel::CMD tap_src_to_cmd(uint8_t tap_src) {
-  // We only care about tap events in the X direction
-#if 0
-  if ( (tap_src & lis::TAP_SRC_X) == 0) {
-    return accel::CMD::NONE;
-  }
+static void clear_tap() {
+  // We just want to set the permits back to 0 if it's not already there.
+  sem_try_acquire(&sem);
+}
 
-  // We only care about taps in one direction
-  if ( (tap_src & lis::TAP_SRC_NEG) == 0) {
-    return accel::CMD::NONE;
+static constexpr const char* state_to_str(STATE s) {
+  switch(s) {
+  case STATE::START:
+    return "START";
+  case STATE::TAP_1:
+    return "TAP_1";
+  case STATE::NOISY_TAP:
+    return "NOISY_TAP";
+  case STATE::WAIT_1:
+    return "WAIT_1";
+  case STATE::EVENT_SINGLE_TAP:
+    return "SINGLE_TAP_EVENT";
+  case STATE::EVENT_DOUBLE_TAP:
+    return "DOUBLE_TAP_EVENT";
   }
-#endif
-
-  // Now we can check whether it was a single or double tap
-  if (tap_src & lis::TAP_SRC_STAP) {
-    return accel::CMD::NEXT;
-  }
-
-  else if (tap_src & lis::TAP_SRC_DTAP) {
-    return accel::CMD::TOGGLE_AWAKE;
-  }
-
-  // WHOOPS. No idea how we got here.
-  return accel::CMD::NONE;
+  return "???";
 }
