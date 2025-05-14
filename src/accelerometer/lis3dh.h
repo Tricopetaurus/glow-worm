@@ -63,7 +63,7 @@ namespace lis {
   constexpr int TAP_SRC_X = (1<<0);
 
   constexpr int REG_TAP_THS = 0x3A;
-  constexpr int TAP_THS_DEFAULT = 90;
+  constexpr int TAP_THS_DEFAULT = 80;
 
   constexpr int REG_TAP_DURATION = 0x3B;
   constexpr int TAP_DURATION_DEFAULT = 0x33;

@@ -14,7 +14,7 @@
 // ================================
 static constexpr int LED_PIN = 21;
 static constexpr int LED_POWER_EN = 23;
-static constexpr int NUM_LEDS = 8; // TODO: I think it's actually 7.
+static constexpr int NUM_LEDS = 7; // TODO: I think it's actually 7.
 
 // DEV NOTE:
 // led_driver's constructor has a side effect of turning the LEDs on.
